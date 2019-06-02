@@ -1,0 +1,11 @@
+[package]
+name = "vowpalwabbit"
+version = "8.6.1-beta"
+authors = ["Jack Gerrits <jack@jackgerrits.com>"]
+edition = "2018"
+repository = "https://github.com/jackgerrits/vowpalwabbit-rs"
+license = "MIT"
+description = "Rust types, and CLI for VowpalWabbit"
+
+[dependencies]
+vowpalwabbit-sys = "8.6.1-beta"
