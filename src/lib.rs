@@ -1,11 +1,14 @@
+#[macro_use]
+extern crate pest_derive;
+
 pub mod hash;
 pub mod parser;
 
 #[cfg(feature = "native-bindings")]
 pub mod bnd {
-    use vowpalwabbit_sys;
     use std::ffi::CString;
     use std::option::Option;
+    use vowpalwabbit_sys;
 
     pub struct All {
         handle: vowpalwabbit_sys::VW_HANDLE,
@@ -29,14 +32,15 @@ pub mod bnd {
     }
 
     impl<'a> Example<'a> {
-        pub fn new(command_line: &str) -> All {
-            let command_line_cstr = CString::new(command_line).unwrap();
-            let a;
+        pub fn from_text(all: &All, line: &str) -> Example {
+            let ex;
             unsafe {
-                a = vowpalwabbit_sys::VW_InitializeA(command_line_cstr.as_ptr());
+                ex = vowpalwabbit_sys::VW_ReadExample(all.handle, line.as_ptr());
             }
-
-            All { handle: a }
+            Example {
+                handle: ex,
+                all_handle: Some(all),
+            };
         }
 
         pub fn finish(&mut self) {
@@ -64,4 +68,3 @@ pub mod bnd {
         }
     }
 }
-

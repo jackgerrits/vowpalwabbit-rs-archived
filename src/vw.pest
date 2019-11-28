@@ -1,0 +1,18 @@
+ws = _{" " | "\t"}
+colon_seperator = _{ ":" }
+namespace_seperator = _{ "|" }
+reserved_character = { colon_seperator | ws | namespace_seperator}
+
+name = { (!reserved_character ~ ANY)+ }
+number = { "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+
+feature = { (name ~ (colon_seperator ~ number)?) | number }
+namespace = { namespace_seperator ~ (name)? ~ (ws+ ~ feature)* }
+
+// Label definitions
+simple_label = { number }
+label = { simple_label }
+
+tag = { ("'" ~ name ~ ws+) | name}
+
+line = {SOI ~ ws* ~ (label ~ ws+)? ~ tag? ~ namespace* ~ ws* ~ EOI}
