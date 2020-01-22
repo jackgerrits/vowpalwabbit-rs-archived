@@ -177,7 +177,7 @@ fn parser_test() {
   let file = VWParser::parse(Rule::line, "4 'tag |test test:-4.5 another -4.5")
     .expect("unsuccessful parse") // unwrap the parse result
     .next()
-    .unwrap(); // get and unwrap the `line` rule; never fail
+    .unwrap(); // Get and unwrap the `line` rule; never fail
   let n = file.into_inner();
   let features = process(n, 0).unwrap();
   assert_eq!(features.namespace_indices.len(), 1);
