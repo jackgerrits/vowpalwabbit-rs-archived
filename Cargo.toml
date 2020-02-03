@@ -13,7 +13,7 @@ harness = false
 
 [dependencies]
 byteorder = "1.3.2"
-vowpalwabbit-sys = "8.8.0+post3"
+vowpalwabbit-sys = { git = "https://github.com/jackgerrits/vowpalwabbit-sys-rs.git" }
 pest = "2.1.2"
 pest_derive = "2.1.0"
 
