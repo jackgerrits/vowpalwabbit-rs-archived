@@ -10,7 +10,7 @@ fn fmix(mut h: u32) -> u32 {
     h
 }
 
-#[allow(exceeding_bitshifts)]
+#[allow(arithmetic_overflow)]
 pub fn uniform_hash(key: &[u8], seed: u64) -> u64 {
     let num_blocks = key.len() / 4;
     let mut h1 = seed as u32;

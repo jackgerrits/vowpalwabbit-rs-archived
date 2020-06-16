@@ -1,6 +1,6 @@
 [package]
 name = "vowpalwabbit"
-version = "8.7.0"
+version = "8.8.1"
 authors = ["Jack Gerrits <jack@jackgerrits.com>"]
 edition = "2018"
 repository = "https://github.com/jackgerrits/vowpalwabbit-rs"
@@ -13,7 +13,7 @@ harness = false
 
 [dependencies]
 byteorder = "1.3.2"
-vowpalwabbit-sys = "8.8.1+vw-v8.8.0"
+vowpalwabbit-sys = { git = "https://github.com/jackgerrits/vowpalwabbit-sys-rs", branch = "new_c_interface" }
 pest = "2.1.2"
 pest_derive = "2.1.0"
 

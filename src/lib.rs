@@ -1,131 +1,123 @@
 #[macro_use]
 extern crate pest_derive;
 
+pub mod error;
 pub mod hash;
 pub mod parser;
 
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::option::Option;
+use std::mem;
 use vowpalwabbit_sys;
 
-pub struct All {
-    handle: vowpalwabbit_sys::VW_HANDLE,
+use error::{Result, VWError, VWErrorNew};
+
+struct ErrorString {
+    handle: *mut vowpalwabbit_sys::VWErrorString,
 }
 
-pub struct Example<'a> {
-    handle: vowpalwabbit_sys::VW_EXAMPLE,
-    all_handle: Option<&'a All>,
-}
+impl ErrorString {
+    fn null_handle() -> *mut vowpalwabbit_sys::VWErrorString {
+        0 as *mut vowpalwabbit_sys::VWErrorString
+    }
 
-impl From<String> for All {
-    fn from(command_line: String) -> Self {
-        let command_line_cstr = CString::new(command_line).unwrap();
-        let a;
+    fn new() -> Self {
         unsafe {
-            a = vowpalwabbit_sys::VW_InitializeA(command_line_cstr.as_ptr());
+            ErrorString {
+                handle: vowpalwabbit_sys::VWCreateErrorString(),
+            }
         }
-
-        All { handle: a }
     }
-}
 
-impl From<&str> for All {
-    fn from(command_line: &str) -> Self {
-        let command_line_cstr = CString::new(command_line).unwrap();
-        let a;
+    // TODO this should be const
+    fn to_str(&mut self) -> Result<&str> {
         unsafe {
-            a = vowpalwabbit_sys::VW_InitializeA(command_line_cstr.as_ptr());
-        }
+            let raw_string = vowpalwabbit_sys::VWErrorStringToCString(self.handle);
+            let c_str: &CStr = CStr::from_ptr(raw_string);
 
-        All { handle: a }
+            match c_str.to_str() {
+                Ok(unwrapped_str) => Ok(unwrapped_str),
+                Err(err) => Err(VWError::new(
+                    vowpalwabbit_sys::VW_FAIL,
+                    format!("Failed to read error string: {}", err.to_string()),
+                )),
+            }
+        }
+    }
+
+    fn as_ptr(&self) -> *const vowpalwabbit_sys::VWErrorString {
+        self.handle
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut vowpalwabbit_sys::VWErrorString {
+        self.handle
     }
 }
 
-impl From<&CStr> for All {
-    fn from(command_line: &CStr) -> Self {
-        let a;
-        unsafe {
-            a = vowpalwabbit_sys::VW_InitializeA(command_line.as_ptr());
-        }
-
-        All { handle: a }
-    }
-}
-trait ExampleNew<'a, T> {
-    fn new(all: &'a All, line: T) -> Example<'a>;
-}
-
-impl<'a> ExampleNew<'a, &CStr> for Example<'a> {
-    fn new(all: &'a All, line: &CStr) -> Example<'a> {
-        let ex;
-        unsafe {
-            ex = vowpalwabbit_sys::VW_ReadExampleA(all.handle, line.as_ptr());
-        }
-        Example {
-            handle: ex,
-            all_handle: Some(all),
-        }
-    }
-}
-
-impl<'a> ExampleNew<'a, &str> for Example<'a> {
-    fn new(all: &'a All, line: &str) -> Example<'a> {
-        let ex_str = CString::new(line).unwrap();
-        let ex;
-        unsafe {
-            ex = vowpalwabbit_sys::VW_ReadExampleA(all.handle, ex_str.as_ptr());
-        }
-        Example {
-            handle: ex,
-            all_handle: Some(all),
-        }
-    }
-}
-
-impl<'a> ExampleNew<'a, String> for Example<'a> {
-    fn new(all: &'a All, line: String) -> Example<'a> {
-        let ex_str = CString::new(line).unwrap();
-        let ex;
-        unsafe {
-            ex = vowpalwabbit_sys::VW_ReadExampleA(all.handle, ex_str.as_ptr());
-        }
-        Example {
-            handle: ex,
-            all_handle: Some(all),
-        }
-    }
-}
-
-impl<'a> Example<'a> {
-    pub fn finish(&mut self) {
-        match self.all_handle {
-            Some(all_handle) => unsafe {
-                vowpalwabbit_sys::VW_FinishExample(all_handle.handle, self.handle);
-                self.all_handle = Option::None;
-            },
-            None => (),
-        }
-    }
-}
-
-impl Drop for All {
+impl Drop for ErrorString {
     fn drop(&mut self) {
         unsafe {
-            vowpalwabbit_sys::VW_Finish(self.handle);
+            vowpalwabbit_sys::VWDestroyErrorString(self.handle);
         }
     }
 }
 
-impl<'a> Drop for Example<'a> {
+pub struct Workspace {
+    pub handle: *mut vowpalwabbit_sys::VWWorkspace,
+}
+
+impl Drop for Workspace {
     fn drop(&mut self) {
-        self.finish();
+        unsafe {
+            vowpalwabbit_sys::VWDestroyWorkspace(self.handle, ErrorString::null_handle());
+        }
+    }
+}
+
+impl Workspace {
+    pub fn new(command_line: String) -> Result<Self> {
+        unsafe {
+            let mut err_str = ErrorString::new();
+            let command_line_cstr = CString::new(command_line).unwrap();
+            let mut options = mem::MaybeUninit::uninit();
+            let result = vowpalwabbit_sys::VWCreateOptionsFromCommandLineCString(
+                command_line_cstr.as_ptr(),
+                options.as_mut_ptr(),
+                err_str.as_mut_ptr(),
+            );
+
+            if result != vowpalwabbit_sys::VW_SUCCESS {
+                return Err(VWError::new(result, err_str.to_str()?));
+            }
+            let options = options.assume_init();
+
+            let mut workspace_handle = mem::MaybeUninit::uninit();
+
+            let ignored: *mut std::ffi::c_void = 0 as *mut std::ffi::c_void;
+
+            let result = vowpalwabbit_sys::VWCreateWorkspace(
+                options,
+                false,
+                None,
+                ignored,
+                workspace_handle.as_mut_ptr(),
+                err_str.as_mut_ptr(),
+            );
+
+            if result != vowpalwabbit_sys::VW_SUCCESS {
+                return Err(VWError::new(result, err_str.to_str()?));
+            }
+
+            let workspace_handle = workspace_handle.assume_init();
+            vowpalwabbit_sys::VWDestroyOptions(options, err_str.as_mut_ptr());
+            return Ok(Workspace {
+                handle: workspace_handle,
+            });
+        }
     }
 }
 
 #[test]
 fn test_basic_command_line() {
-    let a: CString = CString::new("--quiet").unwrap();
-    let all = All::from(a.as_c_str());
-    let _ = Example::new(&all, "test");
+    let _workspace = Workspace::new("--quiet".to_string()).unwrap();
 }
