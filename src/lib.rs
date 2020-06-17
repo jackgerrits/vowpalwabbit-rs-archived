@@ -4,13 +4,14 @@ extern crate pest_derive;
 pub mod error;
 pub mod hash;
 pub mod parser;
+pub mod options;
 
 use std::ffi::CStr;
-use std::ffi::CString;
-use std::mem;
+use std::{cell::RefCell, mem};
 use vowpalwabbit_sys;
 
 use error::{Result, VWError, VWErrorNew};
+use options::Options;
 
 struct ErrorString {
     handle: *mut vowpalwabbit_sys::VWErrorString,
@@ -24,15 +25,15 @@ impl ErrorString {
     fn new() -> Self {
         unsafe {
             ErrorString {
-                handle: vowpalwabbit_sys::VWCreateErrorString(),
+                handle: vowpalwabbit_sys::vw_create_error_string(),
             }
         }
     }
 
     // TODO this should be const
-    fn to_str(&mut self) -> Result<&str> {
+    fn to_str(&self) -> Result<&str> {
         unsafe {
-            let raw_string = vowpalwabbit_sys::VWErrorStringToCString(self.handle);
+            let raw_string = vowpalwabbit_sys::vw_error_string_to_c_string(self.handle);
             let c_str: &CStr = CStr::from_ptr(raw_string);
 
             match c_str.to_str() {
@@ -54,22 +55,25 @@ impl ErrorString {
     }
 }
 
+
 impl Drop for ErrorString {
     fn drop(&mut self) {
         unsafe {
-            vowpalwabbit_sys::VWDestroyErrorString(self.handle);
+            vowpalwabbit_sys::vw_destroy_error_string(self.handle);
         }
     }
 }
 
 pub struct Workspace {
-    pub handle: *mut vowpalwabbit_sys::VWWorkspace,
+    handle: *mut vowpalwabbit_sys::VWWorkspace,
+    /// This is kept around to reduce the need to alloc this for each call.
+    error_string: RefCell<ErrorString>,
 }
 
 impl Drop for Workspace {
     fn drop(&mut self) {
         unsafe {
-            vowpalwabbit_sys::VWDestroyWorkspace(self.handle, ErrorString::null_handle());
+            vowpalwabbit_sys::vw_destroy_workspace(self.handle, ErrorString::null_handle());
         }
     }
 }
@@ -77,26 +81,15 @@ impl Drop for Workspace {
 impl Workspace {
     pub fn new(command_line: String) -> Result<Self> {
         unsafe {
-            let mut err_str = ErrorString::new();
-            let command_line_cstr = CString::new(command_line).unwrap();
-            let mut options = mem::MaybeUninit::uninit();
-            let result = vowpalwabbit_sys::VWCreateOptionsFromCommandLineCString(
-                command_line_cstr.as_ptr(),
-                options.as_mut_ptr(),
-                err_str.as_mut_ptr(),
-            );
-
-            if result != vowpalwabbit_sys::VW_SUCCESS {
-                return Err(VWError::new(result, err_str.to_str()?));
-            }
-            let options = options.assume_init();
+            let mut options = Options::from_command_line(command_line.as_ref())?;
 
             let mut workspace_handle = mem::MaybeUninit::uninit();
 
             let ignored: *mut std::ffi::c_void = 0 as *mut std::ffi::c_void;
 
-            let result = vowpalwabbit_sys::VWCreateWorkspace(
-                options,
+            let mut err_str = ErrorString::new();
+            let result = vowpalwabbit_sys::vw_create_workspace(
+                options.as_mut_ptr(),
                 false,
                 None,
                 ignored,
@@ -109,9 +102,9 @@ impl Workspace {
             }
 
             let workspace_handle = workspace_handle.assume_init();
-            vowpalwabbit_sys::VWDestroyOptions(options, err_str.as_mut_ptr());
             return Ok(Workspace {
                 handle: workspace_handle,
+                error_string: RefCell::new(err_str),
             });
         }
     }
