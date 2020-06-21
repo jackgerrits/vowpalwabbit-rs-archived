@@ -12,22 +12,12 @@ pub struct VWError {
     message: String,
 }
 
-pub trait VWErrorNew<T> {
-    fn new(code: VWStatus, msg: T) -> VWError;
-}
-
-impl VWErrorNew<&str> for VWError {
-    fn new(code: VWStatus, msg: &str) -> VWError {
+impl VWError {
+    pub fn new<S: Into<String>>(code: VWStatus, msg: S) -> VWError {
         VWError {
             code,
-            message: msg.to_string(),
+            message: msg.into(),
         }
-    }
-}
-
-impl VWErrorNew<String> for VWError {
-    fn new(code: VWStatus, msg: String) -> VWError {
-        VWError { code, message: msg }
     }
 }
 

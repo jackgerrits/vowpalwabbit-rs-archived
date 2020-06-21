@@ -1,7 +1,7 @@
 use std::ffi::CString;
 use std::{cell::RefCell, mem};
 
-use crate::{ErrorString, Result, VWError, VWErrorNew};
+use crate::{ErrorString, Result, VWError};
 
 pub struct Options {
     handle: *mut vowpalwabbit_sys::VWOptions,

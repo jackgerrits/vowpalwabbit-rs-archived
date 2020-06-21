@@ -2,7 +2,7 @@ use vowpalwabbit_sys;
 
 use std::{cell::RefCell, sync::Mutex};
 
-use crate::{ErrorString, Result, VWError, VWErrorNew};
+use crate::{ErrorString, Result, VWError};
 use std::mem;
 
 // This will break if the allocator is not threadsafe

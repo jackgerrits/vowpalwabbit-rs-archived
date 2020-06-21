@@ -5,16 +5,16 @@ extern crate pest_derive;
 extern crate lazy_static;
 
 pub mod error;
-pub mod hash;
-pub mod parser;
-pub mod options;
 pub mod example;
+pub mod hash;
+pub mod options;
+pub mod parser;
 
 use std::ffi::CStr;
 use std::{cell::RefCell, mem};
 use vowpalwabbit_sys;
 
-use error::{Result, VWError, VWErrorNew};
+use error::{Result, VWError};
 use options::Options;
 
 struct ErrorString {
@@ -58,7 +58,6 @@ impl ErrorString {
         self.handle
     }
 }
-
 
 impl Drop for ErrorString {
     fn drop(&mut self) {
