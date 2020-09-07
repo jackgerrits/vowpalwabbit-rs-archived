@@ -93,7 +93,6 @@ impl Workspace {
             let mut err_str = ErrorString::new();
             let result = vowpalwabbit_sys::vw_create_workspace(
                 options.as_mut_ptr(),
-                false,
                 None,
                 ignored,
                 workspace_handle.as_mut_ptr(),
