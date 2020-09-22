@@ -20,9 +20,9 @@ jobs:
       with:
         path: target
         key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.toml') }}
-    # - name: Install LLVM for Bindgen
-    #   if: matrix.os == 'windows-latest'
-    #   run: choco install llvm
+    - name: Install LLVM for Bindgen
+      if: matrix.os == 'windows-latest'
+      run: choco install llvm
     - name: Clean cache for package
       run: cargo clean -p vowpalwabbit
     - name: Build
