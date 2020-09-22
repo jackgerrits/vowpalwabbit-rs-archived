@@ -13,7 +13,7 @@ harness = false
 
 [dependencies]
 byteorder = "1.3.2"
-vowpalwabbit-sys = { git = "https://github.com/jackgerrits/vowpalwabbit-sys-rs", branch = "new_c_interface" }
+vowpalwabbit-sys = { git = "https://github.com/jackgerrits/vowpalwabbit-sys-rs", rev = "013e2d289357bf285c984235e6a010f14e622b24" }
 pest = "2.1.2"
 pest_derive = "2.1.0"
 lazy_static = "1.4.0"

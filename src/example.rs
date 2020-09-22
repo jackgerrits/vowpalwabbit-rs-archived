@@ -48,7 +48,7 @@ impl Example {
                 err_str.as_mut_ptr(),
             );
 
-            if result != vowpalwabbit_sys::VW_SUCCESS {
+            if result != vowpalwabbit_sys::VW_success {
                 return Err(VWError::new(result, err_str.to_str()?));
             }
 
@@ -68,7 +68,7 @@ impl Example {
                 item.as_mut_ptr(),
                 self.error_string.borrow_mut().as_mut_ptr(),
             );
-            if result != vowpalwabbit_sys::VW_SUCCESS {
+            if result != vowpalwabbit_sys::VW_success {
                 return Err(VWError::new(result, self.error_string.borrow().to_str()?));
             }
             Ok(item.assume_init())

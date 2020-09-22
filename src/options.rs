@@ -17,7 +17,7 @@ impl Options {
             let result =
                 vowpalwabbit_sys::vw_create_options(options.as_mut_ptr(), err_str.as_mut_ptr());
 
-            if result != vowpalwabbit_sys::VW_SUCCESS {
+            if result != vowpalwabbit_sys::VW_success {
                 return Err(VWError::new(result, err_str.to_str()?));
             }
 
@@ -39,7 +39,7 @@ impl Options {
                 err_str.as_mut_ptr(),
             );
 
-            if result != vowpalwabbit_sys::VW_SUCCESS {
+            if result != vowpalwabbit_sys::VW_success {
                 return Err(VWError::new(result, err_str.to_str()?));
             }
 
@@ -60,7 +60,7 @@ impl Options {
                 self.error_string.borrow_mut().as_mut_ptr(),
             );
 
-            if result != vowpalwabbit_sys::VW_SUCCESS {
+            if result != vowpalwabbit_sys::VW_success {
                 panic!(
                     "set_float failed with code: {}, message: {}",
                     result,

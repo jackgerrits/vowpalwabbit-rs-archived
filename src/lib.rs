@@ -18,18 +18,18 @@ use error::{Result, VWError};
 use options::Options;
 
 struct ErrorString {
-    handle: *mut vowpalwabbit_sys::VWErrorString,
+    handle: *mut vowpalwabbit_sys::VWErrorInfo,
 }
 
 impl ErrorString {
-    fn null_handle() -> *mut vowpalwabbit_sys::VWErrorString {
-        0 as *mut vowpalwabbit_sys::VWErrorString
+    fn null_handle() -> *mut vowpalwabbit_sys::VWErrorInfo {
+        0 as *mut vowpalwabbit_sys::VWErrorInfo
     }
 
     fn new() -> Self {
         unsafe {
             ErrorString {
-                handle: vowpalwabbit_sys::vw_create_error_string(),
+                handle: vowpalwabbit_sys::vw_create_error_info(),
             }
         }
     }
@@ -37,24 +37,24 @@ impl ErrorString {
     // TODO this should be const
     fn to_str(&self) -> Result<&str> {
         unsafe {
-            let raw_string = vowpalwabbit_sys::vw_error_string_to_c_string(self.handle);
+            let raw_string = vowpalwabbit_sys::vw_error_info_get_message(self.handle);
             let c_str: &CStr = CStr::from_ptr(raw_string);
 
             match c_str.to_str() {
                 Ok(unwrapped_str) => Ok(unwrapped_str),
                 Err(err) => Err(VWError::new(
-                    vowpalwabbit_sys::VW_FAIL,
+                    vowpalwabbit_sys::VW_unknown,
                     format!("Failed to read error string: {}", err.to_string()),
                 )),
             }
         }
     }
 
-    fn as_ptr(&self) -> *const vowpalwabbit_sys::VWErrorString {
+    fn as_ptr(&self) -> *const vowpalwabbit_sys::VWErrorInfo {
         self.handle
     }
 
-    fn as_mut_ptr(&mut self) -> *mut vowpalwabbit_sys::VWErrorString {
+    fn as_mut_ptr(&mut self) -> *mut vowpalwabbit_sys::VWErrorInfo {
         self.handle
     }
 }
@@ -62,7 +62,7 @@ impl ErrorString {
 impl Drop for ErrorString {
     fn drop(&mut self) {
         unsafe {
-            vowpalwabbit_sys::vw_destroy_error_string(self.handle);
+            vowpalwabbit_sys::vw_destroy_error_info(self.handle);
         }
     }
 }
@@ -99,7 +99,7 @@ impl Workspace {
                 err_str.as_mut_ptr(),
             );
 
-            if result != vowpalwabbit_sys::VW_SUCCESS {
+            if result != vowpalwabbit_sys::VW_success {
                 return Err(VWError::new(result, err_str.to_str()?));
             }
 
