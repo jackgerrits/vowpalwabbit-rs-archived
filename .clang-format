@@ -1,0 +1,11 @@
+BasedOnStyle: Google
+AccessModifierOffset: -2
+AlignAfterOpenBracket: DontAlign
+AlignOperands: false
+BreakBeforeBraces: Allman
+BreakConstructorInitializersBeforeComma: true
+ColumnLimit: 120
+SortIncludes: true
+IndentPPDirectives: AfterHash
+PointerAlignment: Left
+DerivePointerAlignment: false

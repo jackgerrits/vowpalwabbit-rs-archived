@@ -1,131 +1,130 @@
-#[macro_use]
-extern crate pest_derive;
-
+mod binding;
 pub mod hash;
-pub mod parser;
 
+use ::std::os::raw::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::option::Option;
-use vowpalwabbit_sys;
 
-pub struct All {
-    handle: vowpalwabbit_sys::VW_HANDLE,
+use thiserror::Error;
+
+use crate::binding::VW_STATUS_SUCCESS;
+
+#[derive(Error, Debug)]
+pub enum VWError {
+    #[error("Generic failure")]
+    Failure(String),
 }
 
-pub struct Example<'a> {
-    handle: vowpalwabbit_sys::VW_EXAMPLE,
-    all_handle: Option<&'a All>,
+struct ErrorMessageHolder {
+    error_string: *const ::std::os::raw::c_char,
 }
 
-impl From<String> for All {
-    fn from(command_line: String) -> Self {
-        let command_line_cstr = CString::new(command_line).unwrap();
-        let a;
-        unsafe {
-            a = vowpalwabbit_sys::VW_InitializeA(command_line_cstr.as_ptr());
+impl ErrorMessageHolder {
+    fn new() -> Self {
+        ErrorMessageHolder {
+            error_string: std::ptr::null(),
         }
-
-        All { handle: a }
     }
-}
 
-impl From<&str> for All {
-    fn from(command_line: &str) -> Self {
-        let command_line_cstr = CString::new(command_line).unwrap();
-        let a;
-        unsafe {
-            a = vowpalwabbit_sys::VW_InitializeA(command_line_cstr.as_ptr());
-        }
-
-        All { handle: a }
+    fn get_mut_ptr(&mut self) -> *mut *const ::std::os::raw::c_char {
+        &mut self.error_string
     }
-}
 
-impl From<&CStr> for All {
-    fn from(command_line: &CStr) -> Self {
-        let a;
-        unsafe {
-            a = vowpalwabbit_sys::VW_InitializeA(command_line.as_ptr());
-        }
-
-        All { handle: a }
-    }
-}
-trait ExampleNew<'a, T> {
-    fn new(all: &'a All, line: T) -> Example<'a>;
-}
-
-impl<'a> ExampleNew<'a, &CStr> for Example<'a> {
-    fn new(all: &'a All, line: &CStr) -> Example<'a> {
-        let ex;
-        unsafe {
-            ex = vowpalwabbit_sys::VW_ReadExampleA(all.handle, line.as_ptr());
-        }
-        Example {
-            handle: ex,
-            all_handle: Some(all),
+    fn to_string(&self) -> Option<String> {
+        if !self.error_string.is_null() {
+            unsafe {
+                Some(
+                    CStr::from_ptr(self.error_string)
+                        .to_string_lossy()
+                        .into_owned(),
+                )
+            }
+        } else {
+            None
         }
     }
 }
 
-impl<'a> ExampleNew<'a, &str> for Example<'a> {
-    fn new(all: &'a All, line: &str) -> Example<'a> {
-        let ex_str = CString::new(line).unwrap();
-        let ex;
-        unsafe {
-            ex = vowpalwabbit_sys::VW_ReadExampleA(all.handle, ex_str.as_ptr());
-        }
-        Example {
-            handle: ex,
-            all_handle: Some(all),
-        }
-    }
-}
-
-impl<'a> ExampleNew<'a, String> for Example<'a> {
-    fn new(all: &'a All, line: String) -> Example<'a> {
-        let ex_str = CString::new(line).unwrap();
-        let ex;
-        unsafe {
-            ex = vowpalwabbit_sys::VW_ReadExampleA(all.handle, ex_str.as_ptr());
-        }
-        Example {
-            handle: ex,
-            all_handle: Some(all),
-        }
-    }
-}
-
-impl<'a> Example<'a> {
-    pub fn finish(&mut self) {
-        match self.all_handle {
-            Some(all_handle) => unsafe {
-                vowpalwabbit_sys::VW_FinishExample(all_handle.handle, self.handle);
-                self.all_handle = Option::None;
-            },
-            None => (),
-        }
-    }
-}
-
-impl Drop for All {
+impl Drop for ErrorMessageHolder {
     fn drop(&mut self) {
         unsafe {
-            vowpalwabbit_sys::VW_Finish(self.handle);
+            let res = binding::VWFreeErrorMessage(self.error_string);
+            if res != VW_STATUS_SUCCESS {
+                panic!("Error while dropping error message");
+            }
         }
     }
 }
 
-impl<'a> Drop for Example<'a> {
-    fn drop(&mut self) {
-        self.finish();
+pub struct Workspace {
+    workspace: *mut binding::VWWorkspace,
+}
+
+impl Workspace {
+    pub fn new(args: &[String]) -> Result<Workspace, VWError> {
+        let mut workspace: *mut binding::VWWorkspace = std::ptr::null_mut();
+
+        // let mut x: binding::VWWorkspace = binding::VWWorkspace;
+
+        let args = args
+            .iter()
+            .map(|arg| CString::new(arg.clone()).unwrap())
+            .collect::<Vec<CString>>();
+
+        let c_args = args
+            .iter()
+            .map(|arg| arg.as_ptr())
+            .collect::<Vec<*const ::std::os::raw::c_char>>();
+
+        let mut error_message_holder = ErrorMessageHolder::new();
+        unsafe {
+            let res = binding::VWInitializeWorkspace(
+                c_args.as_ptr(),
+                c_args.len() as c_int,
+                &mut workspace,
+                error_message_holder.get_mut_ptr(),
+            );
+
+            if res != 0 {
+                match error_message_holder.to_string() {
+                    Some(message) => Err(VWError::Failure(message)),
+                    None => Err(VWError::Failure("Unknown".to_string())),
+                }
+            } else {
+                Ok(Workspace { workspace })
+            }
+        }
+    }
+
+    pub fn run_driver(&mut self) -> Result<(), VWError> {
+        let mut error_message_holder = ErrorMessageHolder::new();
+        unsafe {
+            let res = binding::VWRunDriver(self.workspace, error_message_holder.get_mut_ptr());
+             if res != 0 {
+                match error_message_holder.to_string() {
+                    Some(message) => Err(VWError::Failure(message)),
+                    None => Err(VWError::Failure("Unknown".to_string())),
+                }
+            } else {
+                Ok(())
+        }
+        }
     }
 }
 
-#[test]
-fn test_basic_command_line() {
-    let a: CString = CString::new("--quiet").unwrap();
-    let all = All::from(a.as_c_str());
-    let _ = Example::new(&all, "test");
+impl Drop for Workspace {
+    fn drop(&mut self) {
+        unsafe {
+            let mut error_string: *const ::std::os::raw::c_char = std::ptr::null();
+            let res = binding::VWFreeWorkspace(self.workspace, &mut error_string);
+            if res != VW_STATUS_SUCCESS {
+                let message = if !error_string.is_null() {
+                    CStr::from_ptr(error_string).to_string_lossy().into_owned()
+                } else {
+                    "Unknown".to_string()
+                };
+                panic!("Error while dropping Workspace: {}", message);
+            }
+        }
+    }
 }
